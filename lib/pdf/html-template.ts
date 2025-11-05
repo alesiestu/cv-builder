@@ -1,11 +1,12 @@
 // lib/pdf/html-template.ts
 import type { Data } from "@/types/cv";
 
-const esc = (s: string) =>
-  (s || "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]!));
+// esc ora accetta string | undefined | null
+const esc = (s?: string | null) =>
+  (s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]!));
 
 export function cvHtmlTemplate(data: Data) {
-  const exp = data.exp.map(e => `
+  const exp = (data.exp ?? []).map(e => `
     <div class="item">
       <div class="row">
         <div class="role"><strong>${esc(e.role)}</strong> — ${esc(e.company)}</div>
@@ -25,7 +26,7 @@ export function cvHtmlTemplate(data: Data) {
     </div>
   `).join("");
 
-  const edu = data.edu.map(e => `
+  const edu = (data.edu ?? []).map(e => `
     <div class="row">
       <div><strong>${esc(e.degree)}</strong> — ${esc(e.school)}</div>
       <div class="dates">${esc(e.start||"")} – ${esc(e.end||"")}</div>
@@ -33,7 +34,7 @@ export function cvHtmlTemplate(data: Data) {
     ${e.desc ? `<div class="desc">${esc(e.desc)}</div>` : ""}
   `).join("");
 
-  const langs = data.languages?.length
+  const langs = (data.languages && data.languages.length)
     ? `<div class="section">
          <h2>Lingue</h2>
          <ul class="ul">
@@ -49,7 +50,7 @@ export function cvHtmlTemplate(data: Data) {
        </div>`
     : "";
 
-  const skills = data.skills.length
+  const skills = (data.skills && data.skills.length)
     ? `<div class="section">
          <h2>Competenze</h2>
          <ul class="ul">
@@ -57,6 +58,12 @@ export function cvHtmlTemplate(data: Data) {
          </ul>
        </div>`
     : "";
+
+  // Type guard per far capire a TS che dopo il filter sono string
+  const contacts = [data.profile.email, data.profile.phone, data.profile.location, data.profile.website]
+    .filter((x): x is string => Boolean(x))
+    .map(esc)
+    .join(" • ");
 
   return `<!DOCTYPE html>
 <html lang="it">
@@ -95,10 +102,7 @@ export function cvHtmlTemplate(data: Data) {
   <div class="page noshadow">
     <h1>${esc(data.profile.name)}</h1>
     <div class="title">${esc(data.profile.title || "")}</div>
-    <div class="contacts">${
-      [data.profile.email, data.profile.phone, data.profile.location, data.profile.website]
-      .filter(Boolean).map(esc).join(" • ")
-    }</div>
+    <div class="contacts">${contacts}</div>
     <div class="sep"></div>
 
     ${data.profile.summary ? `
@@ -107,13 +111,13 @@ export function cvHtmlTemplate(data: Data) {
       <div class="text">${esc(data.profile.summary)}</div>
     </div>` : ""}
 
-    ${data.exp.length ? `
+    ${(data.exp && data.exp.length) ? `
     <div class="section">
       <h2>Esperienza (Timeline)</h2>
       ${exp}
     </div>` : ""}
 
-    ${data.edu.length ? `
+    ${(data.edu && data.edu.length) ? `
     <div class="section">
       <h2>Istruzione</h2>
       ${edu}
@@ -121,7 +125,7 @@ export function cvHtmlTemplate(data: Data) {
 
     ${langs}
     ${license}
-   
+    ${skills}
   </div>
 </body>
 </html>`;
