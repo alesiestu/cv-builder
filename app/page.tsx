@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 
 import type { Data } from "@/types/cv";
 import { exportPdfFromHtmlTemplate } from "@/lib/pdf";
+import { cvHtmlTemplate } from "@/lib/pdf/html-template";
+
 
 // ---------------- Types locali per UI ----------------
 interface Profile { name: string; title: string; location?: string; email?: string; phone?: string; website?: string; summary?: string; license?: string; }
@@ -104,17 +106,7 @@ export default function Page() {
       <div className="sticky top-0 z-50 backdrop-blur border-b border-white/10 bg-black/30">
         <div className="mx-auto max-w-7xl px-4 py-3 flex flex-wrap items-center gap-2">
           <strong className="mr-auto text-sm tracking-wide uppercase text-slate-300">Easy FREE CV Builder — Write from Iannacone Alessandro</strong>
-          <select value={data.layout} onChange={e=>setData(d=>({...d, layout:e.target.value as Data["layout"]}))} className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-sm">
-            <option value="classic">Layout: Classico</option>
-            <option value="sidebar">Layout: Sidebar</option>
-            <option value="timeline">Layout: Timeline</option>
-          </select>
-          <select value={data.theme} onChange={e=>setData(d=>({...d, theme:e.target.value as Data["theme"]}))} className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-sm">
-            <option value="violet">Tema: Violet</option>
-            <option value="emerald">Tema: Emerald</option>
-            <option value="slate">Tema: Slate</option>
-            <option value="rose">Tema: Rose</option>
-          </select>
+         
 
           <button
             onClick={() =>
@@ -125,7 +117,7 @@ export default function Page() {
             }
             className="px-3 py-1.5 rounded-lg bg-white text-black text-sm"
           >
-            Genera PDF (template HTML semplice)
+            Genera PDF
           </button>
         </div>
       </div>
@@ -270,8 +262,11 @@ export default function Page() {
         </div>
 
         {/* Preview */}
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 overflow-auto print:p-0 print:border-0 print:bg-white">
+     {/*    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 overflow-auto print:p-0 print:border-0 print:bg-white">
           <CVPreview data={data} />
+        </div>*/}
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 overflow-auto">
+          <CVPreviewStatic data={data} />
         </div>
       </div>
     </div>
@@ -318,21 +313,45 @@ function Primary(props:any){ return <ButtonBase {...props} className="bg-white t
 function Ghost(props:any){ return <ButtonBase {...props} className="bg-transparent text-slate-300 border-slate-700/70 hover:bg-slate-800/50"/> }
 function Danger(props:any){ return <ButtonBase {...props} className="bg-rose-600 border-rose-500 text-white hover:brightness-95"/> }
 
-// ---------------- Preview (A4) ----------------
-function CVPreview({data}:{data:Data}){
+
+
+function normalizeDataForTemplate(data: any) {
+  return {
+    ...data,
+    profile: { ...(data.profile || {}), license: data?.profile?.license || "" },
+    languages: Array.isArray(data?.languages) ? data.languages : [],
+    exp: Array.isArray(data?.exp) ? data.exp : [],
+    edu: Array.isArray(data?.edu) ? data.edu : [],
+    skills: Array.isArray(data?.skills) ? data.skills : [],
+  };
+}
+
+
+function CVPreviewStatic({ data }: { data: Data }) {
+  const html = cvHtmlTemplate(normalizeDataForTemplate(data));
   return (
-    <div className="flex justify-center print:block">
-      <div
-        data-cv-paper
-        className="bg-white text-slate-900 w-[210mm] min-h-[297mm] shadow-2xl print:shadow-none rounded-xl print:rounded-none overflow-hidden"
-      >
-        {data.layout === "sidebar" && <SidebarLayout data={data} />}
-        {data.layout === "classic" && <ClassicLayout data={data} />}
-        {data.layout === "timeline" && <TimelineLayout data={data} />}
+    <div className="flex justify-center">
+      {/* cornice opzionale intorno all'iframe */}
+      <div className="rounded-xl overflow-hidden shadow-2xl border border-slate-200">
+        <iframe
+          // NB: srcDoc = HTML del template PDF
+          srcDoc={html}
+          // 210×297 mm ≈ A4
+          style={{
+            width: "210mm",
+            height: "297mm",
+            border: "0",
+            background: "#fff",
+          }}
+          // migliora rendering font
+          sandbox=""
+          aria-label="Anteprima CV (stesso template del PDF)"
+        />
       </div>
     </div>
   );
 }
+
 
 function Header({profile}:{profile:Profile}){
   return (
@@ -361,236 +380,6 @@ function Tag({children}:{children:React.ReactNode}){
   return <span className="text-[10px] px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">{children}</span>;
 }
 
-// -------- Layout: Sidebar --------
-function SidebarLayout({data}:{data:Data}){
-  const pal = palette[data.theme];
-  return (
-    <div className="grid grid-cols-[34%_1fr]">
-      {/* Left column */}
-      <div className={`p-8 text-white bg-gradient-to-br ${pal.bg}`}>
-        <div className="w-28 h-28 rounded-2xl bg-white/10 border border-white/20 mb-6 grid place-items-center text-xs">Foto</div>
-        <div className="text-2xl font-bold leading-tight">{data.profile.name||"\u00A0"}</div>
-        <div className="opacity-90">{data.profile.title}</div>
-        <div className="mt-6 text-sm space-y-1 opacity-90">
-          {data.profile.email && <div>{data.profile.email}</div>}
-          {data.profile.phone && <div>{data.profile.phone}</div>}
-          {data.profile.location && <div>{data.profile.location}</div>}
-          {data.profile.website && <div>{data.profile.website}</div>}
-        </div>
-
-        {(data.skills||[]).length>0 && (
-          <div className="mt-8">
-            <div className="text-xs uppercase tracking-wider text-white/80 mb-2">Competenze</div>
-            <div className="flex flex-wrap gap-2">
-              {(data.skills||[]).map((s,i)=>(<span key={i} className="text-[10px] bg-white/15 border border-white/25 px-2 py-1 rounded-full">{s}</span>))}
-            </div>
-          </div>
-        )}
-
-        {(data.proj||[]).length>0 && (
-          <div className="mt-8">
-            <div className="text-xs uppercase tracking-wider text-white/80 mb-2">Progetti</div>
-            <div className="space-y-2 text-sm">
-              {(data.proj||[]).map((p,i)=>(
-                <div key={i}>
-                  <div className="font-medium">{p.name}{p.link && <span className="opacity-80"> — {p.link}</span>}</div>
-                  {p.desc && <div className="opacity-80 text-[12px]">{p.desc}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {(data.languages||[]).length>0 && (
-          <Section title="Lingue">
-            <div className="text-[13px] space-y-1">
-              {(data.languages||[]).map((l,i)=>(
-                <div key={i}>{l.name} — <span className="text-slate-200">{l.level}</span></div>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {data.profile.license && (
-          <Section title="Patente">
-            <div className="text-[13px]">{data.profile.license}</div>
-          </Section>
-        )}
-      </div>
-
-      {/* Right column */}
-      <div className="p-8">
-        <Header profile={data.profile} />
-        {data.profile.summary && (
-          <Section title="Profilo">
-            <p className="text-[13px] leading-6 text-slate-700">{data.profile.summary}</p>
-          </Section>
-        )}
-        {(data.exp||[]).length>0 && (
-          <Section title="Esperienza">
-            <div className="space-y-4">
-              {(data.exp||[]).map((e:any,i:number)=> (
-                <div key={i} className="border border-slate-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold">{e.role} — {e.company}</div>
-                    <div className="text-xs text-slate-500">{e.start} – {e.end}</div>
-                  </div>
-                  {e.desc && <p className="text-[13px] mt-2 text-slate-700">{e.desc}</p>}
-                  {e.stack && (
-                    <div className="mt-2 flex flex-wrap gap-2">{e.stack.split(",").map((s:string,ii:number)=>(<Tag key={ii}>{s.trim()}</Tag>))}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-        {(data.edu||[]).length>0 && (
-          <Section title="Istruzione">
-            <div className="space-y-2">
-              {(data.edu||[]).map((e:any,i:number)=>(
-                <div key={i} className="flex items-center justify-between text-[13px]">
-                  <div className="font-medium">{e.degree} — {e.school}</div>
-                  <div className="text-xs text-slate-500">{e.start} – {e.end}</div>
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// -------- Layout: Classic --------
-function ClassicLayout({data}:{data:Data}){
-  return (
-    <div className="p-8">
-      <Header profile={data.profile} />
-      {data.profile.summary && (
-        <Section title="Profilo">
-          <p className="text-[13px] leading-6 text-slate-700">{data.profile.summary}</p>
-        </Section>
-      )}
-      {(data.exp||[]).length>0 && (
-        <Section title="Esperienza">
-          {(data.exp||[]).map((e:any,i:number)=> (
-            <div key={i} className="py-3 border-b border-slate-200 last:border-0">
-              <div className="flex items-center justify-between">
-                <div className="font-semibold">{e.role} — {e.company}</div>
-                <div className="text-xs text-slate-500">{e.start} – {e.end}</div>
-              </div>
-              {e.desc && <p className="text-[13px] mt-1 text-slate-700">{e.desc}</p>}
-              {e.stack && (
-                <div className="mt-1 flex flex-wrap gap-2">{e.stack.split(",").map((s:string,ii:number)=>(<Tag key={ii}>{s.trim()}</Tag>))}</div>
-              )}
-            </div>
-          ))}
-        </Section>
-      )}
-      {(data.edu||[]).length>0 && (
-        <Section title="Istruzione">
-          {(data.edu||[]).map((e:any,i:number)=>(
-            <div key={i} className="text-[13px] py-1 flex items-center justify-between">
-              <div className="font-medium">{e.degree} — {e.school}</div>
-              <div className="text-xs text-slate-500">{e.start} – {e.end}</div>
-            </div>
-          ))}
-        </Section>
-      )}
-      {(data.skills||[]).length>0 && (
-        <Section title="Competenze">
-          <div className="flex flex-wrap gap-2">{(data.skills||[]).map((s,i)=>(<Tag key={i}>{s}</Tag>))}</div>
-        </Section>
-      )}
-      {(data.proj||[]).length>0 && (
-        <Section title="Progetti">
-          <div className="space-y-2 text-[13px]">
-            {(data.proj||[]).map((p:any,i:number)=>(<div key={i}><span className="font-medium">{p.name}</span>{p.link && <span className="text-slate-600"> — {p.link}</span>} {p.desc && <span>· {p.desc}</span>}</div>))}
-          </div>
-        </Section>
-      )}
-      {(data.languages||[]).length>0 && (
-        <Section title="Lingue">
-          <div className="text-[13px] space-y-1">
-            {(data.languages||[]).map((l,i)=>(
-              <div key={i}>{l.name} — <span className="text-slate-600">{l.level}</span></div>
-            ))}
-          </div>
-        </Section>
-      )}
-      {data.profile.license && (
-        <Section title="Patente">
-          <div className="text-[13px]">{data.profile.license}</div>
-        </Section>
-      )}
-    </div>
-  );
-}
-
-// -------- Layout: Timeline --------
-function TimelineLayout({data}:{data:Data}){
-  return (
-    <div className="p-8">
-      <Header profile={data.profile} />
-      {data.profile.summary && (
-        <Section title="Profilo">
-          <p className="text-[13px] leading-6 text-slate-700">{data.profile.summary}</p>
-        </Section>
-      )}
-      {(data.exp||[]).length>0 && (
-        <Section title="Esperienza (Timeline)">
-          <div className="relative pl-6">
-            <div className="absolute left-2 top-0 bottom-0 w-px bg-slate-200"/>
-            {(data.exp||[]).map((e:any,i:number)=> (
-              <div key={i} className="relative mb-5">
-                <div className="absolute -left-[7px] top-1 w-3 h-3 rounded-full bg-slate-400 border-2 border-white" />
-                <div className="rounded-xl border border-slate-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold">{e.role} — {e.company}</div>
-                    <div className="text-xs text-slate-500">{e.start} – {e.end}</div>
-                  </div>
-                  {e.desc && <p className="text-[13px] mt-2 text-slate-700">{e.desc}</p>}
-                  {e.stack && (
-                    <div className="mt-2 flex flex-wrap gap-2">{e.stack.split(",").map((s:string,ii:number)=>(<Tag key={ii}>{s.trim()}</Tag>))}</div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-      {(data.edu||[]).length>0 && (
-        <Section title="Istruzione">
-          {(data.edu||[]).map((e:any,i:number)=>(
-            <div key={i} className="text-[13px] py-1 flex items-center justify-between">
-              <div className="font-medium">{e.degree} — {e.school}</div>
-              <div className="text-xs text-slate-500">{e.start} – {e.end}</div>
-            </div>
-          ))}
-        </Section>
-      )}
-      {(data.skills||[]).length>0 && (
-        <Section title="Competenze">
-          <div className="flex flex-wrap gap-2">{(data.skills||[]).map((s,i)=>(<Tag key={i}>{s}</Tag>))}</div>
-        </Section>
-      )}
-      {(data.languages||[]).length>0 && (
-        <Section title="Lingue">
-          <div className="text-[13px] space-y-1">
-            {(data.languages||[]).map((l,i)=>(
-              <div key={i}>{l.name} — <span className="text-slate-600">{l.level}</span></div>
-            ))}
-          </div>
-        </Section>
-      )}
-      {data.profile.license && (
-        <Section title="Patente">
-          <div className="text-[13px]">{data.profile.license}</div>
-        </Section>
-      )}
-    </div>
-  );
-}
 
 // ---------------- utils ----------------
 function mut<T extends keyof Data>(i:number, key:T, field: string, value:any, setData:React.Dispatch<React.SetStateAction<Data>>) {
